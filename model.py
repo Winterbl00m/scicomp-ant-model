@@ -64,10 +64,10 @@ class Ant:
         """
         Updates an exploring ant's position and direction
         """
-        self.direction_index = self.turn_explore()
+        self.direction_index = self.random_turn()
         self.move()
 
-    def turn_explore(self):
+    def random_turn(self):
         """
         Updates an exploring ant's direction
         """
@@ -79,26 +79,36 @@ class Ant:
         return new_direction_index
 
 
+
     def follow(self):
         """
         Updates an trail following ant's position and direction
         """
-        trail_direction_indexs = [i for i, e in enumerate(self.adjacent_cells_values) if e != 0.0]
-        if len(trail_direction_indexs) == 1:
-            trail_direction_index  = trail_direction_indexs[0]
+        trails_directions = [i for i, e in enumerate(self.adjacent_cells_values) if e != 0.0]
+        if len(trails_directions) == 1:
+            trail_direction_index  = trails_directions[0]
             self.direction_index = trail_direction_index
             self.move()
         else: 
-            self.fork(trail_direction_indexs)
+            self.fork(trails_directions)
 
-
-    def fork(self, trail_direction_indexs):
+    def fork(self, trails_directions):
         """
         Handles case of more than one trail near the ant
         """
-        #TODO implement this 
-        self.is_lost = True
-        self.explore()
+        strongest_trails_directions = [i for i, e in enumerate(self.adjacent_cells_values) if e == max(self.adjacent_cells_values)]
+
+        if self.direction_index in trails_directions:
+            self.move()
+
+        elif (len(strongest_trails_directions) > 1):
+            self.is_lost = True
+            self.explore()
+
+        else: 
+            self.direction_index = strongest_trails_directions[0]
+            self.move()
+
 
     def near_trail(self):
         """
@@ -111,7 +121,7 @@ class Ant:
 class Model:
     def __init__(self):
         self.ants = set()
-        self.grid = pd.DataFrame(np.zeros((20, 20)))
+        self.grid = pd.DataFrame(np.zeros((20, 20))) 
 
         self.evaporation_rate = 0 
         self.tau = 10 
@@ -133,7 +143,6 @@ class Model:
         for ant in self.ants:
             x = ant.x
             y = ant.y
-            # print("depositing " + str(self.tau) + "at " + str(x) + str(y))
             self.grid[x][y] += self.tau
 
     def evaporate(self): 
@@ -151,15 +160,9 @@ class Model:
         """
         for ant in self.ants.copy():
             ant.adjacent_cells_values = ant.find_adjacnet_cells_values(self.grid)
-
             if ant.is_lost:
                 ant.explore()
-                # print("exloring ant is at " + str(ant.x) + "," + str(ant.y))
-                
             else:
-                # print("following ant is at " + str(ant.x) + "," + str(ant.y))
-                # print("Adjacents cells are " + str(ant.find_adjacnet_cells(self.grid)))
-                # print("near_trail " + str(ant.near_trail()))
                 ant.follow()
 
             if (not ant.is_in_grid(self.grid)):
@@ -185,11 +188,8 @@ class Model:
         # self.draw()      
 
 model = Model()
-model.release_ant(True)
-model.step()
-model.draw()
 
-model.release_ant(False)
 for i in range(5):
     model.step()
     model.draw()
+
