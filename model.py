@@ -211,7 +211,7 @@ class Model:
             ant_xs.append((ant.x + .5))
             ant_ys.append((ant.y + .5))
         plt.pcolormesh(self.grid, cmap='Greys')
-        plt.scatter(ant_xs, ant_ys)
+        # plt.scatter(ant_xs, ant_ys) #this line is still in development
         plt.show()
 
 
