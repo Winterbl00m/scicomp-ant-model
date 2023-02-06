@@ -2,15 +2,41 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import random
-from time import sleep
-import matplotlib.cm as cm
-# import matplotlib.pyplot.clf as clear_output
-
-        # self.min_phi = 0 
-        # self.delta_phi = 0
-        # self.sauration_concentration  = 0 
 
 class Ant:
+    """
+    An ant agents who will form trails
+
+    Attributes:
+    min_phi : int (between 0 and 255)
+        the minimum probability that an ant will follow a trail
+    turning_kernal : list of floats
+        the proabilitlies that an exploring ant will make a specfic turn
+    delta_phi : int 
+        the amount that the proability an ant will follow a trail increase per unit pheramone
+    sautration_concentration: int
+        the amount of pheramone above which an ant cannot differentiate. 
+    last_x : int
+        the x position the ant was in on the last time step
+    last_y : int 
+        the y position the ant was in on the last time step
+    x : int
+        the x position the ant is in
+    y : int 
+        the y position the ant is in
+    possible_moves : list of tuples in form (delta_x, delta_y)
+        a list of all possible changes in an ants position in one time step
+    direction : int (0-7)
+        the direction that an ant is pointing with 0 being "north", 1 being"NE", 2 being "E", etc. 
+    is_lost : boolean
+        true if ant is lost (exploring) and false if not (following a trail)
+
+    adjacent_cells_values : list of floats
+        the pheramone concentration in the adjecent cells
+        *Note: values are in directional order 
+        (ex. the value at index = 0 is the phermone concentration of the cell due north of the ant)*
+    
+    """
     def __init__(self, starting_x, starting_y, turning_kernel, min_phi, delta_phi, sauturation_concentration):
         self.turning_kernel = turning_kernel
         self.min_phi = min_phi
@@ -21,15 +47,24 @@ class Ant:
         self.x = starting_x
         self.y = starting_y
 
-        self.directions = [(0, 1), (1, 1), (1,0), (1, -1), (0, -1), (-1, -1), (-1, 0), (-1, 1)]
-        self.direction_index = random.randint(1,7)
+        self.possible_moves = [(0, 1), (1, 1), (1,0), (1, -1), (0, -1), (-1, -1), (-1, 0), (-1, 1)]
+        self.direction = random.randint(1,7)
         self.is_lost =  True
         self.adjacent_cells_values = []
 
 
     def is_in_grid(self, grid, x = None, y = None):
         """
-        Returns true if the posotion is in the grid and flase if else
+        Returns true if the posotion is in the grid and false if else
+            Parameters:
+                grid (df) : the dataframe to check
+                x (int) : x position
+                y (int) : y position
+
+            Returns:
+                (boolean)
+
+        *Note:If x and y are not given they are assumed to be that of the ant's positons*
         """
         if x == None:
             x = self.x
@@ -37,22 +72,24 @@ class Ant:
             y = self.y
         return  (x < grid.shape[0] and y < grid.shape[1] and x >= 0 and y >= 0)
 
-    def find_adjacnet_cells(self, grid):
-        cells = []
-        for direction in self.directions:
-            x = self.x + direction[0]
-            y = self.y + direction[1]
-            cells.append((x,y))
-        return cells
 
     def find_adjacnet_cells_values(self, grid):
-        cells = self.find_adjacnet_cells(grid)
+        """
+        Finds the values of the cells adjacent to the ant
+
+            Parameters:
+                grid (df) : the dataframe to check
+            Returns
+                values (lst of floats) : the values of the adjecent cells
+
+        """
         values = []
-        for (x,y) in cells:
-            is_last_position = (x == self.last_x and y == self.last_y)
-            if (self.is_in_grid(grid, x, y) and not is_last_position):
-                value = grid[x][y]
-                values.append(value)
+        for move in self.possible_moves:
+            x = self.x + move[0]
+            y = self.y + move[1]
+
+            if (self.is_in_grid(grid, x, y)):
+                values.append(grid[x][y])
             else: 
                 values.append(0.0)
         return values
@@ -63,55 +100,48 @@ class Ant:
         """
         self.last_x = self.x
         self.last_y = self.y
-        self.x += self.directions[self.direction_index][0]
-        self.y += self.directions[self.direction_index][1]
+        self.x += self.possible_moves[self.direction][0]
+        self.y += self.possible_moves[self.direction][1]
 
     def explore(self):
-        """
-        Updates an exploring ant's position and direction
-        """
-        self.direction_index = self.random_turn()
-
-    def random_turn(self):
         """
         Updates an exploring ant's direction
         """
         turning_amount_choices = [1,2,3,4]
         turn_amount = random.choices(turning_amount_choices, weights=self.turning_kernel, k=1)[0]
         turn_direction = random.randint(-1, 1) #left or right
-        new_direction = self.direction_index + turn_amount * turn_direction
-        new_direction_index = (8 + new_direction) % 8  #translates our new_direction into an index between 0-7
-        return new_direction_index
+        new_direction = (self.direction + turn_amount * turn_direction + 8) % 8
 
+        self.direction = new_direction
 
     def follow(self):
         """
         Updates an trail following ant's position and direction
         """
-        trails_directions = [i for i, e in enumerate(self.adjacent_cells_values) if e != 0.0]
-        if len(trails_directions) == 1:
-            trail_direction_index  = trails_directions[0]
-            self.direction_index = trail_direction_index
+        trails_possible_moves = [i for i, e in enumerate(self.adjacent_cells_values) if e != 0.0]
+        if len(trails_possible_moves) == 1:
+            trail_direction  = trails_possible_moves[0]
+            self.direction = trail_direction
         else: 
-            self.fork(trails_directions)
+            self.fork(trails_possible_moves)
 
-    def fork(self, trails_directions):
+    def fork(self, trails_possible_moves):
         """
         Handles case of more than one trail near the ant
+            Parameters:
+                trails_possible_moves (lst of ints) : a list of directions in which a trail lies. 
         """
-        strongest_trails_directions = [i for i, e in enumerate(self.adjacent_cells_values) if e == max(self.adjacent_cells_values)]
+        strongest_trails_possible_moves = [i for i, e in enumerate(self.adjacent_cells_values) if e == max(self.adjacent_cells_values)]
 
-        if self.direction_index in trails_directions:
-            self.direction_index = self.direction_index
+        if self.direction in trails_possible_moves:
+            pass
 
-        elif (len(strongest_trails_directions) > 1):
+        elif (len(strongest_trails_possible_moves) > 1):
             self.is_lost = True
             self.explore()
 
         else: 
-            self.direction_index = strongest_trails_directions[0]
-
-
+            self.direction = strongest_trails_possible_moves[0]
 
     def near_trail(self):
         """
@@ -127,34 +157,69 @@ class Ant:
         """
 
         trail_concentration = max(self.adjacent_cells_values)
-        probability = self.min_phi / 256
+
+        #Ensures the concentration input is not greater than the saturation concentration
+        concentration = max(trail_concentration, self.sauturation_concentration) 
+        probability = (self.min_phi + self.delta_phi * concentration)/ 256
         return random.random() < probability
 
+
 class Model:
-    def __init__(self):
+    """The model containing the lattice and a set of ants
+
+    Attributes:
+    size : int
+        the width and height of the square lattice 
+    tau  : int 
+        how much pheramone an ant deposits per time step
+    min_phi : int (between 0 and 255)
+        the minimum probability that an ant will follow a trail
+    turning_kernal : list of floats
+        the proabilitlies that an exploring ant will make a specfic turn
+    delta_phi : int 
+        the amount that the proability an ant will follow a trail increase per unit pheramone
+    sautration_concentration: int
+        the amount of pheramone above which an ant cannot differentiate. 
+    """
+    def __init__(self, 
+        size, 
+        tau, 
+        min_phi, 
+        turning_kernel,
+        delta_phi = 0, 
+        sauturation_concentration = 0)
+
         self.ants = set()
-        self.grid = pd.DataFrame(np.zeros((100, 100))) 
+        self.grid = pd.DataFrame(np.zeros((size, size))) 
 
         self.evaporation_rate = 1 
-        self.tau = 8
+        self.tau = tau
 
-        self.min_phi = 255
-        self.delta_phi = 0
-        self.sauturation_concentration = 0
-        self.turning_kernel = [.36, .047, .008, .004]
+        self.min_phi = min_phi
+        self.delta_phi = delta_phi
+        self.sauturation_concentration = sauturation_concentration
+        self.turning_kernel = turning_kernel
 
 
     def draw(self):
         """
         Draws the Grid
         """
+        ant_xs = []
+        ant_ys = []
+        for ant in self.ants:
+            ant_xs.append((ant.x + .5))
+            ant_ys.append((ant.y + .5))
         plt.pcolormesh(self.grid, cmap='Greys')
+        plt.scatter(ant_xs, ant_ys)
         plt.show()
 
 
     def deposit(self, ant):
         """
-        adds a set amount(tau) of pheramones to all cells where ants are present
+        adds a set amount(tau) of pheramones to the cell where the ant is present
+            Parameters:
+                ant (Ant) : the ant which is depositing the pheramones
         """
 
         x = ant.x
@@ -172,31 +237,33 @@ class Model:
 
     def update_ants(self):
         """
-        Updates an all ants positions and directions
+        Updates an all ants positions and possible_moves
         """
         num_followers = 0
         num_lost = 0
 
         for ant in self.ants.copy():
-            ant.adjacent_cells_values = ant.find_adjacnet_cells_values(self.grid)
+            if (ant.is_in_grid(self.grid)):
+                ant.adjacent_cells_values = ant.find_adjacnet_cells_values(self.grid)
 
-            if ant.near_trail():
-                ant.is_lost = not ant.follows_trail()
+                if ant.near_trail():
+                    ant.is_lost = not ant.follows_trail()
 
+                if ant.is_lost:
+                    ant.explore()
+                else:
+                    ant.follow()
+
+                self.deposit(ant)
+                ant.move()
+            else:
+                self.ants.remove(ant)
+
+        for ant in self.ants:
             if ant.is_lost:
-                ant.explore()
                 num_lost += 1
             else:
-                ant.follow()
                 num_followers += 1
-
-            if (not ant.is_in_grid(self.grid)):
-                self.ants.remove(ant)
-            else:
-                self.deposit(ant)
-
-            ant.move()
-
 
         return num_followers, num_lost
 
@@ -219,11 +286,28 @@ class Model:
         F, L = self.update_ants()
         print("F = " + str(F))
         print("L = " + str(L))
-        # self.draw()      
 
-model = Model()
+    def save(self):
+        """
+        Saves the data in the model to csv's
+        """
+        self.grid.to_csv("grid.csv")
+        ant_xs = []
+        ant_ys = []
+        for ant in self.ants:
+            ant_xs.append((ant.x + .5))
+            ant_ys.append((ant.y + .5))
+        ant_positions = pd.DataFrame({'x':ant_xs, 'y':ant_xs})
+        ant_positions.to_csv("ant_positions.csv")
 
-for i in range(10000):
+size = 100
+tau = 8
+min_phi = 255
+turning_kernel = [.36, .047, .008, .004]
+model = Model(size, tau, min_phi, turning_kernel)
+
+for i in range(100):
     print(i)
     model.step()
 model.draw()
+model.save()
