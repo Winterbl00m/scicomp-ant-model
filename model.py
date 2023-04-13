@@ -16,10 +16,6 @@ class Ant:
         the amount that the proability an ant will follow a trail increase per unit pheramone
     sautration_concentration: int
         the amount of pheramone above which an ant cannot differentiate. 
-    last_x : int
-        the x position the ant was in on the last time step
-    last_y : int 
-        the y position the ant was in on the last time step
     x : int
         the x position the ant is in
     y : int 
@@ -42,8 +38,6 @@ class Ant:
         self.min_phi = min_phi
         self.delta_phi = delta_phi
         self.sauturation_concentration = sauturation_concentration
-        # self.last_x = starting_x
-        # self.last_y = starting_y
         self.x = starting_x
         self.y = starting_y
 
@@ -73,12 +67,12 @@ class Ant:
         return  (x < grid.shape[0] and y < grid.shape[1] and x >= 0 and y >= 0)
 
 
-    def find_adjacnet_cells_values(self, grid):
+    def find_adjacnet_cells_values(self, pheromones):
         """
         Finds the values of the cells adjacent to the ant
 
             Parameters:
-                grid (df) : the dataframe to check
+                pheromones (df) : the dataframe to check
             Returns
                 values (lst of floats) : the values of the adjecent cells
 
@@ -89,10 +83,10 @@ class Ant:
             y = self.y + move[1]
 
             ant_is_facing = (abs(i - self.direction) <= 1)
-            is_in_grid = self.is_in_grid(grid, x, y)
+            is_in_grid = self.is_in_grid(pheromones, x, y)
 
             if (ant_is_facing and is_in_grid):
-                values.append(grid[x][y])
+                values.append(pheromones[x][y])
             else: 
                 values.append(0.0)
         return values
@@ -192,10 +186,13 @@ class Model:
         min_phi, 
         turning_kernel,
         delta_phi = 0, 
-        sauturation_concentration = 0):
+        sauturation_concentration = 0,
+        food_locations = [[0,0,0]]):
 
         self.ants = set()
-        self.grid = pd.DataFrame(np.zeros((size, size))) 
+        self.pheromones = pd.DataFrame(np.zeros((size, size))) 
+        self.food = pd.DataFrame(np.zeros((size, size))) 
+        self.add_food(food_locations)
 
         self.evaporation_rate = 1 
         self.tau = tau
@@ -205,20 +202,31 @@ class Model:
         self.sauturation_concentration = sauturation_concentration
         self.turning_kernel = turning_kernel
 
+    def add_food(self, food_locations):
+        for location in food_locations:
+            x = location[0]
+            y = location[1]
+            amount = location[2]
+            self.food[x][y] = amount
 
     def draw(self):
         """
-        Draws the Grid
+        Draws the pheromones
         """
         ant_xs = []
         ant_ys = []
-        center_x, center_y = self.grid.shape[0] // 2, self.grid.shape[1] // 2
-        draw_grid = self.grid.copy()
-        draw_grid[center_x][center_y] = 0
+        center_x, center_y = self.pheromones.shape[0] // 2, self.pheromones.shape[1] // 2
+        pheromones = self.pheromones.copy()
+        food = self.food.copy()
+        food[food == 0] = np.nan
         for ant in self.ants:
             ant_xs.append((ant.x + .5))
             ant_ys.append((ant.y + .5))
-        plt.pcolormesh(draw_grid, cmap='Greys')
+        plt.pcolormesh(pheromones, cmap='Greys')
+        plt.pcolormesh(food, cmap='jet')
+        cmap = plt.cm.get_cmap('jet')
+        cmap.set_bad(alpha=0)
+
         # plt.scatter(ant_xs, ant_ys) #this line is still in development
         plt.show()
 
@@ -230,18 +238,18 @@ class Model:
                 ant (Ant) : the ant which is depositing the pheramones
         """
         for ant in self.ants.copy():
-            if (ant.is_in_grid(self.grid)):
+            if (ant.is_in_grid(self.pheromones)):
                 x = ant.x
                 y = ant.y
-                self.grid[x][y] += self.tau
+                self.pheromones[x][y] += self.tau
             else:
                 self.ants.remove(ant)
 
     def evaporate(self): 
         """
-        Subtracts a set amount of pheramones from all cells in grid
+        Subtracts a set amount of pheramones from all cells in pheromones
         """
-        self.grid.where(self.grid == 0, self.grid - self.evaporation_rate)
+        self.pheromones.where(self.pheromones == 0, self.pheromones - self.evaporation_rate)
 
 
     def update_ants(self):
@@ -250,7 +258,7 @@ class Model:
         """
 
         for ant in self.ants:
-            ant.adjacent_cells_values = ant.find_adjacnet_cells_values(self.grid)
+            ant.adjacent_cells_values = ant.find_adjacnet_cells_values(self.pheromones)
 
             if ant.near_trail():
                 ant.is_lost = not ant.follows_trail()
@@ -276,7 +284,7 @@ class Model:
         """
         Release a new ant from the hive
         """
-        starting_x, starting_y = self.grid.shape[0] // 2, self.grid.shape[1] // 2
+        starting_x, starting_y = self.pheromones.shape[0] // 2, self.pheromones.shape[1] // 2
         ant = Ant(starting_x, starting_y, self.turning_kernel, self.min_phi, self.delta_phi, self.sauturation_concentration)
         self.ants.add(ant)
 
@@ -296,7 +304,7 @@ class Model:
         """
         Saves the data in the model to csv's
         """
-        self.grid.to_csv("grid.csv")
+        self.pheromones.to_csv("pheromones.csv")
         ant_xs = []
         ant_ys = []
         for ant in self.ants:
@@ -305,13 +313,14 @@ class Model:
         ant_positions = pd.DataFrame({'x':ant_xs, 'y':ant_xs})
         ant_positions.to_csv("ant_positions.csv")
 
-size = 256
+size = 20
 tau = 8
 min_phi = 247
 turning_kernel = [.36, .047, .008, .004]
-model = Model(size, tau, min_phi, turning_kernel)
-
-for i in range(1500):
+food_locations =[[2, 2, 1000]]
+model = Model(size, tau, min_phi, turning_kernel, 0, 0, food_locations)
+print(model.food)
+for i in range(100):
     print(i)
     model.step()
 model.draw()
