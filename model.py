@@ -10,8 +10,6 @@ class Ant:
     Attributes:
     min_phi : int (between 0 and 255)
         the minimum probability that an ant will follow a trail
-    turning_kernal : list of floats
-        the proabilitlies that an exploring ant will make a specfic turn
     delta_phi : int 
         the amount that the proability an ant will follow a trail increase per unit pheramone
     sautration_concentration: int
@@ -33,14 +31,12 @@ class Ant:
         (ex. the value at index = 0 is the phermone concentration of the cell due north of the ant)*
     
     """
-    def __init__(self, starting_x, starting_y, turning_kernel, min_phi, delta_phi, sauturation_concentration):
-        self.turning_kernel = turning_kernel
+    def __init__(self, starting_x, starting_y, min_phi, delta_phi, sauturation_concentration):
         self.min_phi = min_phi
         self.delta_phi = delta_phi
         self.sauturation_concentration = sauturation_concentration
         self.x = starting_x
         self.y = starting_y
-
         self.possible_moves = [(0, 1), (1, 1), (1,0), (1, -1), (0, -1), (-1, -1), (-1, 0), (-1, 1)]
         self.direction = random.randint(1,7)
         self.is_lost =  True
@@ -100,20 +96,20 @@ class Ant:
         self.x += self.possible_moves[self.direction][0]
         self.y += self.possible_moves[self.direction][1]
 
-    def explore(self):
+    def explore(self, turning_kernel):
         """
         Updates an exploring ant's direction
         """
-        prob_go_straight = 1 - 2 * sum(self.turning_kernel)
-        turning_kernel = [prob_go_straight] + self.turning_kernel
+        prob_go_straight = 1 - 2 * sum(turning_kernel)
+        turning_probabilities = [prob_go_straight] + turning_kernel
         turning_amount_choices = [0,1,2,3,4]
-        turn_amount = random.choices(turning_amount_choices, weights=turning_kernel, k=1)[0]
+        turn_amount = random.choices(turning_amount_choices, weights=turning_probabilities, k=1)[0]
         turn_direction = random.randint(-1, 1) #left or right
         new_direction = (self.direction + turn_amount * turn_direction + 8) % 8
 
         self.direction = new_direction
 
-    def follow(self):
+    def follow(self, turning_kernel):
         """
         Updates an trail following ant's position and direction
         """
@@ -122,9 +118,9 @@ class Ant:
             trail_direction  = trails_possible_moves[0]
             self.direction = trail_direction
         else: 
-            self.fork(trails_possible_moves)
+            self.fork(trails_possible_moves, turning_kernel)
 
-    def fork(self, trails_possible_moves):
+    def fork(self, trails_possible_moves, turning_kernel):
         """
         Handles case of more than one trail near the ant
             Parameters:
@@ -137,7 +133,7 @@ class Ant:
 
         elif (len(strongest_trails_possible_moves) > 1):
             self.is_lost = True
-            self.explore()
+            self.explore(turning_kernel)
 
         else: 
             self.direction = strongest_trails_possible_moves[0]
@@ -264,9 +260,9 @@ class Model:
                 ant.is_lost = not ant.follows_trail()
 
             if ant.is_lost:
-                ant.explore()
+                ant.explore(self.turning_kernel)
             else:
-                ant.follow()
+                ant.follow(self.turning_kernel)
             ant.move()
 
         num_followers = 0
@@ -285,7 +281,7 @@ class Model:
         Release a new ant from the hive
         """
         starting_x, starting_y = self.pheromones.shape[0] // 2, self.pheromones.shape[1] // 2
-        ant = Ant(starting_x, starting_y, self.turning_kernel, self.min_phi, self.delta_phi, self.sauturation_concentration)
+        ant = Ant(starting_x, starting_y, self.min_phi, self.delta_phi, self.sauturation_concentration)
         self.ants.add(ant)
 
 
