@@ -42,6 +42,8 @@ class Model:
         self.sauturation_concentration = sauturation_concentration
         self.turning_kernel = turning_kernel
 
+        self.food_collected = 0
+
     def add_food(self, food_locations):
         for location in food_locations:
             x = location[0]
@@ -104,13 +106,11 @@ class Model:
         for ant in self.ants:
             print((ant.x, ant.y))
             ant.adjacent_cells_pheromones = ant.find_adjacnet_cells_values(self.pheromones)
-            print(ant.adjacent_cells_pheromones)
             ant.adjacent_cells_food = ant.find_adjacnet_cells_values(self.food)
-            if ant.smells_food():
+            if (ant.smells_food(self.food, 20) and ant.mode != "go_home"):
                 ant.mode = "gather"
-            elif ant.follows_trail():
+            elif (ant.follows_trail() and ant.mode != "go_home"):
                 ant.mode = "follow"
-
 
             if ant.mode == "explore":
                 ant.explore()
@@ -119,10 +119,10 @@ class Model:
                 ant.follow()
                 followers += 1
             elif ant.mode == "gather":
-                ant.gather()
+                ant.gather(self.food, 20)
                 gatherers += 1
             else: 
-                ant.go_home()
+                ant.go_home(self.food)
                 returners += 1
             ant.move()
         return explorers, followers, gatherers, returners
@@ -162,6 +162,10 @@ class Model:
         ant_positions = pd.DataFrame({'x':ant_xs, 'y':ant_xs})
         ant_positions.to_csv("ant_positions.csv")
 
+
+
+
+
 size = 20
 tau = 8
 min_phi = 247
@@ -174,8 +178,12 @@ model.pheromones[size // 2 - 1][size // 2] = 10.0
 model.pheromones[size // 2][size // 2 + 1] = 10.0
 model.pheromones[size // 2][size // 2 - 1] = 10.0
 
-for i in range(10):
+food_collected = []
+for i in range(20):
     print(i)
+    food_collected.append(0 - model.food[size // 2][size // 2])
     model.step()
 model.draw()
 model.save()
+
+print(food_collected)

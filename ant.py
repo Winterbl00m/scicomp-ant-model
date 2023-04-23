@@ -68,23 +68,38 @@ class Ant:
             self.mode = "explore"
             self.explore()
 
-    def gather(self):
+    def gather(self, food, k):
         """
         Updates a food gather ant's potistion and direction 
-        """
-        if any(ele > 0.0 for ele in adjacent_cells_food):
+        """ 
+        min_x = max(self.x - k , 0)
+        max_x = min(self.x + k , self.board_size)
+        min_y = max(self.y - k , 0)
+        max_y = min(self.y + k , self.board_size)
+        nearby = food.iloc[min_x:max_x, min_y:max_y]
+        max_col = nearby.values.argmax(axis=1).max()
+        max_col_label = nearby.columns[nearby.values.argmax(axis=1) == max_col][0]
+        max_row_label = nearby[max_col_label].idxmax()
+        delta_x = np.sign(max_row_label - self.x)
+        delta_y = np.sign(max_col_label - self.y)
+        if (delta_x == 0 and delta_y == 0):
+            food[self.x][self.y] -= 1
             self.mode = "go_home"
-            self.go_home()
+            self.go_home(food)
+        else:
+            self.direction = self.possible_moves.index((delta_x, delta_y))
 
-    def go_home(self):
+
+    def go_home(self, food):
         """
         Updates a returning ant's potistion and direction 
         """
-        position = [self.x, self.y]
-        next_move = np.sign((position - (board_size // 2)))
-        if next_move != [0,0]:
-            self.direction = self.possible_moves.index(tuple(next_move))
+        delta_x = np.sign((self.board_size // 2) - self.x)
+        delta_y = np.sign((self.board_size // 2) - self.y)
+        if (delta_x != 0 and delta_y != 0):
+            self.direction = self.possible_moves.index((delta_x, delta_y))
         else:
+            food[self.x][self.y] -= 1 
             self.mode = "explore"
             self.explore()
 
@@ -136,5 +151,12 @@ class Ant:
         else:
             return False
 
-    def smells_food(self):
+    def smells_food(self, food, k):
+        min_x = max(self.x - k , 0)
+        max_x = min(self.x + k , self.board_size)
+        min_y = max(self.y - k , 0)
+        max_y = min(self.y + k , self.board_size)
+        nearby = food.iloc[min_x:max_x, min_y:max_y]
+        if nearby.any().any():
+            return True
         return False
