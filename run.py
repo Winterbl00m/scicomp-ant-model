@@ -96,9 +96,15 @@ class Model:
         """
         Updates an all ants positions and possible_moves
         """
+        explorers = 0
+        followers = 0
+        gatherers = 0 
+        returners = 0 
 
         for ant in self.ants:
+            print((ant.x, ant.y))
             ant.adjacent_cells_pheromones = ant.find_adjacnet_cells_values(self.pheromones)
+            print(ant.adjacent_cells_pheromones)
             ant.adjacent_cells_food = ant.find_adjacnet_cells_values(self.food)
             if ant.smells_food():
                 ant.mode = "gather"
@@ -108,14 +114,18 @@ class Model:
 
             if ant.mode == "explore":
                 ant.explore()
+                explorers += 1
             elif ant.mode == "follow":
                 ant.follow()
+                followers += 1
             elif ant.mode == "gather":
                 ant.gather()
+                gatherers += 1
             else: 
                 ant.go_home()
+                returners += 1
             ant.move()
-
+        return explorers, followers, gatherers, returners
 
     def release_ant(self):
         """
@@ -130,10 +140,14 @@ class Model:
         """
         Simulates one time step
         """ 
-        self.release_ant()
+        # self.release_ant()
         self.deposit()
         self.evaporate()
-        self.update_ants()
+        explorers, followers, gatherers, returners = self.update_ants()
+        print("explorers = " + str(explorers))
+        print("followers = " + str(followers))
+        print("gatherers = " + str(gatherers))
+        print("returners = " + str(returners))
 
     def save(self):
         """
@@ -154,8 +168,13 @@ min_phi = 247
 turning_kernel = [.36, .047, .008, .004]
 food_locations =[[2, 2, 1000]]
 model = Model(size, tau, min_phi, turning_kernel, 0, 0, food_locations)
-print(model.food)
-for i in range(100):
+model.release_ant()
+model.pheromones[size // 2 + 1][size // 2] = 10.0
+model.pheromones[size // 2 - 1][size // 2] = 10.0
+model.pheromones[size // 2][size // 2 + 1] = 10.0
+model.pheromones[size // 2][size // 2 - 1] = 10.0
+
+for i in range(10):
     print(i)
     model.step()
 model.draw()
