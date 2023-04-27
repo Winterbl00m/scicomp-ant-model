@@ -1,1 +1,1 @@
-# -scicomp-p1-ant-model
+# scicomp-p1-ant-model

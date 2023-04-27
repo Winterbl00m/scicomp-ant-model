@@ -3,6 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import random
 from ant import Ant
+
 class Model:
     """The model containing the lattice and a set of ants
 
@@ -24,14 +25,16 @@ class Model:
         size, 
         tau, 
         min_phi, 
-        turning_kernel,
+        turning_kernel, 
         delta_phi = 0, 
-        sauturation_concentration = 0,
-        food_locations = [[0,0,0]]):
+        sauturation_concentration = 1,
+        food_locations = [[0,0,0]],
+        k = 10):
 
         self.ants = set()
         self.pheromones = pd.DataFrame(np.zeros((size, size))) 
         self.food = pd.DataFrame(np.zeros((size, size))) 
+        self.food_locations = food_locations
         self.add_food(food_locations)
 
         self.evaporation_rate = 1 
@@ -43,6 +46,7 @@ class Model:
         self.turning_kernel = turning_kernel
 
         self.food_collected = 0
+        self.k = k 
 
     def add_food(self, food_locations):
         for location in food_locations:
@@ -83,7 +87,7 @@ class Model:
             if (ant.is_in_grid(self.pheromones)):
                 x = ant.x
                 y = ant.y
-                self.pheromones[x][y] += self.tau
+                self.pheromones[x][y] += self.tau - (self.tau / self.sauturation_concentration) * self.pheromones[x][y] 
             else:
                 self.ants.remove(ant)
 
@@ -104,27 +108,27 @@ class Model:
         returners = 0 
 
         for ant in self.ants:
-            print((ant.x, ant.y))
-            ant.adjacent_cells_pheromones = ant.find_adjacnet_cells_values(self.pheromones)
-            ant.adjacent_cells_food = ant.find_adjacnet_cells_values(self.food)
-            if (ant.smells_food(self.food, 20) and ant.mode != "go_home"):
-                ant.mode = "gather"
-            elif (ant.follows_trail() and ant.mode != "go_home"):
-                ant.mode = "follow"
+            if not ant.is_in_grid(self.pheromones):
+                self.ants.remove(ant)
+            else:
+                ant.adjacent_cells_pheromones = ant.find_adjacnet_cells_values(self.pheromones)
+                ant.nearby_food = ant.smell_nearby_food(self.food)
+                ant.mode = ant.determine_mode(self.food)
 
-            if ant.mode == "explore":
-                ant.explore()
-                explorers += 1
-            elif ant.mode == "follow":
-                ant.follow()
-                followers += 1
-            elif ant.mode == "gather":
-                ant.gather(self.food, 20)
-                gatherers += 1
-            else: 
-                ant.go_home(self.food)
-                returners += 1
-            ant.move()
+                if ant.mode == "explore":
+                    ant.explore()
+                    explorers += 1
+                elif ant.mode == "follow":
+                    ant.follow()
+                    followers += 1
+                elif ant.mode == "gather":
+                    ant.gather(self.food, 10)
+                    gatherers += 1
+                else: 
+                    ant.go_home(self.food)
+                    returners += 1
+
+                ant.move()
         return explorers, followers, gatherers, returners
 
     def release_ant(self):
@@ -132,7 +136,7 @@ class Model:
         Release a new ant from the hive
         """
         starting_x, starting_y = self.pheromones.shape[0] // 2, self.pheromones.shape[1] // 2
-        ant = Ant(self.pheromones.shape[0], self.turning_kernel, self.min_phi, self.delta_phi, self.sauturation_concentration)
+        ant = Ant(self.pheromones.shape[0], self.turning_kernel, self.min_phi, self.delta_phi, self.sauturation_concentration, self.k)
         self.ants.add(ant)
 
 
@@ -140,14 +144,14 @@ class Model:
         """
         Simulates one time step
         """ 
-        # self.release_ant()
+        self.release_ant()
         self.deposit()
         self.evaporate()
         explorers, followers, gatherers, returners = self.update_ants()
-        print("explorers = " + str(explorers))
-        print("followers = " + str(followers))
-        print("gatherers = " + str(gatherers))
-        print("returners = " + str(returners))
+        # print("explorers = " + str(explorers))
+        # print("followers = " + str(followers))
+        # print("gatherers = " + str(gatherers))
+        # print("returners = " + str(returners))
 
     def save(self):
         """
@@ -164,26 +168,30 @@ class Model:
 
 
 
+    def run(self, minutes):
+        for minute in range(minutes): 
+            for seconds in range(60):
+                model.step()
+                for i, (x, y, last) in enumerate(self.food_locations): 
+                    current = self.food[x][y]
+                    self.food_locations[i][2] = current
+            print(self.food_locations)
 
 
-size = 20
+size = 256
 tau = 8
 min_phi = 247
 turning_kernel = [.36, .047, .008, .004]
-food_locations =[[2, 2, 1000]]
-model = Model(size, tau, min_phi, turning_kernel, 0, 0, food_locations)
-model.release_ant()
-model.pheromones[size // 2 + 1][size // 2] = 10.0
-model.pheromones[size // 2 - 1][size // 2] = 10.0
-model.pheromones[size // 2][size // 2 + 1] = 10.0
-model.pheromones[size // 2][size // 2 - 1] = 10.0
+food_locations =[[38, 38, 1000]]
+model = Model(size, tau, min_phi, turning_kernel, 0, tau, food_locations, k = 2)
+mins = 60
 
-food_collected = []
-for i in range(20):
-    print(i)
-    food_collected.append(0 - model.food[size // 2][size // 2])
-    model.step()
+
+model.run(1)
 model.draw()
-model.save()
 
-print(food_collected)
+for ant in model.ants:
+    print(ant.nearby_food)
+
+
+

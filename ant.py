@@ -2,13 +2,14 @@ import random
 import numpy as np 
 
 class Ant:
-    def __init__(self, board_size, turning_kernel, min_phi, delta_phi, sauturation_concentration):
+    def __init__(self, board_size, turning_kernel, min_phi, delta_phi, sauturation_concentration, k):
         self.x = board_size // 2 
         self.y = board_size // 2
+        self.k = k 
         self.direction = random.randint(1,7)
         self.mode = "explore"
         self.adjacent_cells_pheromones= []
-        self.adjacent_cells_food = []
+        self.nearby_food = []
         self.board_size = board_size
         self.turning_kernel = turning_kernel
         self.possible_moves = [(0, 1), (1, 1), (1,0), (1, -1), (0, -1), (-1, -1), (-1, 0), (-1, 1)]
@@ -35,80 +36,10 @@ class Ant:
             y = self.y
         return  (x < grid.shape[0] and y < grid.shape[1] and x >= 0 and y >= 0)
 
-    def explore(self):
-        """
-        Updates an exploring ant's direction
-        """
-        prob_go_straight = 1 - 2 * sum(self.turning_kernel)
-        turning_probabilities = [prob_go_straight] + self.turning_kernel
-        turning_amount_choices = [0,1,2,3,4]
-        turn_amount = random.choices(turning_amount_choices, weights=turning_probabilities, k=1)[0]
-        turn_direction = random.randint(-1, 1) #left or right
-        new_direction = (self.direction + turn_amount * turn_direction + 8) % 8
-
-        self.direction = new_direction
-
-    def follow(self):
-        """
-        Updates an trail following ant's position and direction
-        """
-
-        straight = self.adjacent_cells_pheromones[1]
-        left = self.adjacent_cells_pheromones[0]
-        right = self.adjacent_cells_pheromones[2]
-
-        #If trail ahead go stright
-        if self.adjacent_cells_pheromones[1] != 0.0:
-            pass
-        elif left > right :
-            self.direction = (self.direction + 1) % 8  
-        elif right > left :
-            self.direction = (self.direction - 1) % 8 
-        else: 
-            self.mode = "explore"
-            self.explore()
-
-    def gather(self, food, k):
-        """
-        Updates a food gather ant's potistion and direction 
-        """ 
-        min_x = max(self.x - k , 0)
-        max_x = min(self.x + k , self.board_size)
-        min_y = max(self.y - k , 0)
-        max_y = min(self.y + k , self.board_size)
-        nearby = food.iloc[min_x:max_x, min_y:max_y]
-        max_col = nearby.values.argmax(axis=1).max()
-        max_col_label = nearby.columns[nearby.values.argmax(axis=1) == max_col][0]
-        max_row_label = nearby[max_col_label].idxmax()
-        delta_x = np.sign(max_row_label - self.x)
-        delta_y = np.sign(max_col_label - self.y)
-        if (delta_x == 0 and delta_y == 0):
-            food[self.x][self.y] -= 1
-            self.mode = "go_home"
-            self.go_home(food)
-        else:
-            self.direction = self.possible_moves.index((delta_x, delta_y))
-
-
-    def go_home(self, food):
-        """
-        Updates a returning ant's potistion and direction 
-        """
-        delta_x = np.sign((self.board_size // 2) - self.x)
-        delta_y = np.sign((self.board_size // 2) - self.y)
-        if (delta_x != 0 and delta_y != 0):
-            self.direction = self.possible_moves.index((delta_x, delta_y))
-        else:
-            food[self.x][self.y] -= 1 
-            self.mode = "explore"
-            self.explore()
-
     def move(self):
         """
         Updates an ant's position forward in whichever direction it is facing
         """
-        # self.last_x = self.x
-        # self.last_y = self.y
         self.x += self.possible_moves[self.direction][0]
         self.y += self.possible_moves[self.direction][1]
 
@@ -134,6 +65,13 @@ class Ant:
                 values.append(0.0)
         return values
 
+    def smell_nearby_food(self, food):
+        min_x = max([self.x - self.k , 0])
+        max_x = min([self.x + self.k , self.board_size])
+        min_y = max([self.y - self.k , 0])
+        max_y = min([self.y + self.k , self.board_size])
+        return food.iloc[min_x:max_x, min_y:max_y]
+
 
     def follows_trail(self):
         """
@@ -151,12 +89,73 @@ class Ant:
         else:
             return False
 
-    def smells_food(self, food, k):
-        min_x = max(self.x - k , 0)
-        max_x = min(self.x + k , self.board_size)
-        min_y = max(self.y - k , 0)
-        max_y = min(self.y + k , self.board_size)
-        nearby = food.iloc[min_x:max_x, min_y:max_y]
-        if nearby.any().any():
-            return True
-        return False
+
+    def explore(self):
+        """
+        Updates an exploring ant's direction
+        """
+        prob_go_straight = 1 - 2 * sum(self.turning_kernel)
+        turning_probabilities = [prob_go_straight] + self.turning_kernel
+        turning_amount_choices = [0,1,2,3,4]
+        turn_amount = random.choices(turning_amount_choices, weights=turning_probabilities, k=1)[0]
+        turn_direction = random.randint(-1, 1) #left or right
+        new_direction = (self.direction + turn_amount * turn_direction + 8) % 8
+
+        self.direction = new_direction
+
+    def follow(self):
+        """
+        Updates an trail following ant's position and direction
+        """
+        straight = self.adjacent_cells_pheromones[1]
+        left = self.adjacent_cells_pheromones[0]
+        right = self.adjacent_cells_pheromones[2]
+
+        #If trail ahead go stright
+        if self.adjacent_cells_pheromones[1] != 0.0:
+            pass
+        elif left > right :
+            self.direction = (self.direction + 1) % 8  
+        elif right > left :
+            self.direction = (self.direction - 1) % 8 
+
+    def gather(self, food, k):
+        """
+        Updates a food gather ant's potistion and direction 
+        """ 
+        col = self.nearby_food.idxmax().idxmax()
+        row = self.nearby_food.max(axis=1).idxmax()
+        delta_x = np.sign(col - self.x)
+        delta_y = np.sign(row - self.y)
+        self.direction = self.possible_moves.index((delta_x, delta_y))
+
+
+    def go_home(self, food):
+        """
+        Updates a returning ant's potistion and direction 
+        """
+        delta_x = np.sign((self.board_size // 2) - self.x)
+        delta_y = np.sign((self.board_size // 2) - self.y)
+        self.direction = self.possible_moves.index((delta_x, delta_y))
+
+
+    def determine_mode(self, food):
+        at_home = not (bool((self.board_size // 2) - self.x) and bool((self.board_size // 2) - self.y))
+        if self.mode == "go_home": 
+            if at_home:
+                return "explore"
+        else: 
+            if self.mode == "gather" and food[self.x][self.y]:
+                food[self.x][self.y] -= 1
+                return "go_home"
+            elif self.nearby_food.any().any():
+                return "gather"
+            elif self.follows_trail():
+                if (self.adjacent_cells_pheromones[1] != 0) and (self.adjacent_cells_pheromones[0] != self.adjacent_cells_pheromones[2]):
+                    return "explore"
+                return "follow"
+
+        return self.mode
+
+
+
