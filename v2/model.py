@@ -73,6 +73,19 @@ class Board():
             #Ant adds more pheromone when returning to nest
             self.pheromones[x][y] += self.tau * ant[3]
 
+    def add_food(self, food_locations):
+        """
+        Finds the values of the cells adjacent to the ant
+            Parameters:
+                food (dict) : 
+                    keys -> locations in (x,y) form
+                    vals -> amount of food to add
+        """
+        for location, amount in food_locations.items():
+            x,y = location 
+            self.food[x][y] = amount 
+
+
     def find_nearby_values(self, ant, dataframe):
         """
         Finds the values of the cells adjacent to the ant
@@ -129,7 +142,6 @@ class Board():
         elif right > left :
             ant[2] = (ant[2] - 1) % 8 
 
-
     def explore(self, ant):
         """
         Updates an exploring ant's direction
@@ -184,7 +196,6 @@ class Board():
         if ant[3] and at_nest:
             # sets a retuning ant at next to  to the nest
             ant[3] = False
-
 
     def turn_ants(self):
         """
@@ -276,8 +287,7 @@ class Board():
         plt.show()
 
 model = Board()
-mins = 60
-model.run(60)
+model.run(minutes = 60)
 model.draw()
 
 
