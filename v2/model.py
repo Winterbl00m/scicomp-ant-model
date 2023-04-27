@@ -43,6 +43,9 @@ class Board():
         return  (x < self.size and y < self.size and x >= 0 and y >= 0)
 
     def release_ant(self):
+        """
+        Releases an ant from the nest
+        """
         nest = self.size // 2
         direction = random.randint(1,7)
         returning_home = False
@@ -56,7 +59,7 @@ class Board():
 
     def deposit(self):
         """
-        adds of pheramones to the cell where the ant is presents
+        Adds of pheramones to the cell where the ant is presents
         """
         for ant in self.ants:
             x = ant[0]
@@ -78,7 +81,6 @@ class Board():
                 dataframe (df) : the dataframe to check
             Returns
                 values (lst of floats) : the values of the adjecent cells
-
         """
         values = []
         direction = ant[2]
@@ -96,8 +98,10 @@ class Board():
     def ant_follows_trail(self, nearby_pheromones):
         """
         Determines if ant explores or follows a trail at any one time step.
-
-        Returns True if ant will follow the trail
+            Parameters:
+                nearby_pheromones (lst): the pheromone amount in the three cells in front of the ant
+            Returns
+                True if ant will follow the trail
         """
         if (nearby_pheromones[1] == 0) and (nearby_pheromones[0] == nearby_pheromones[2]):
             return False
@@ -110,6 +114,9 @@ class Board():
     def follow(self, ant, nearby_pheromones):
         """
         Determines which trail a following ant will follow and updates its direction
+            Parameters:
+                ant (lst) : the ant to update
+                nearby_pheromones (lst): the pheromone amount in the three cells in front of the ant
         """
         left, straight, right = nearby_pheromones
 
@@ -126,6 +133,8 @@ class Board():
     def explore(self, ant):
         """
         Updates an exploring ant's direction
+            Parameters:
+                ant (lst) : the ant to update
         """
         prob_go_straight = 1 - 2 * sum(self.turning_kernel)
         turning_probabilities = [prob_go_straight] + self.turning_kernel
@@ -138,6 +147,10 @@ class Board():
 
     def gather(self, ant, nearby_food):
         """
+        Decrease food in field and send a gathering ant home 
+            Parameters:
+                ant (lst) : the ant to update
+                nearby_food (lst): the food amount in the three cells in front of the ant
         """
         #Calculates where max nearby food is
         max_food_index = nearby_food.index(max(nearby_food)) - 1
@@ -151,6 +164,9 @@ class Board():
 
     def go_to_nest(self, ant):
         """
+        Updates a ants direction to point towards nest
+            Parameters:
+                ant (lst) : the ant to update
         """
         nest = self.size // 2 
         x_direction_of_nest = np.sign(nest - ant[0])
@@ -158,6 +174,11 @@ class Board():
         ant[2] = self.possible_moves.index((x_direction_of_nest, y_direction_of_nest))
 
     def ant_at_nest(self, ant):
+        """
+        Updates and retuning ant's status if it is at the nest
+            Parameters:
+                ant (lst) : the ant to update
+        """
         nest = self.size // 2 
         at_nest = (ant[0] == nest and ant[1] == nest)
         if ant[3] and at_nest:
@@ -191,10 +212,6 @@ class Board():
                 explorers += 1
 
         return explorers, followers, gatherers, returners
-        # print("explorers = " + str(explorers))
-        # print("followers = " + str(followers))
-        # print("gatherers = " + str(gatherers))
-        # print("returners = " + str(returners))
 
     def move_ants(self):
         """
@@ -213,6 +230,9 @@ class Board():
                 self.ants.remove(ant)
 
     def step(self):
+        """
+        Simulates a single timestep (second)
+        """
         self.release_ant()
         self.deposit()
         self.evaporate()
@@ -222,6 +242,9 @@ class Board():
         return explorers, followers, gatherers, returners
 
     def run(self, minutes):
+        """
+        Runs the model for a specified number of minutes
+        """
         for minute in range(minutes): 
             for seconds in range(60):
                 explorers, followers, gatherers, returners = self.step()
@@ -233,7 +256,7 @@ class Board():
 
     def draw(self):
         """
-        Draws the pheromones
+        Draws the pheromones trails and the food
         """
         ant_xs = []
         ant_ys = []
