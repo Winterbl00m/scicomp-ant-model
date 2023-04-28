@@ -3,7 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import random
 import csv
-
+from ant import Ant
 
 class Board():
     def __init__(
@@ -48,7 +48,7 @@ class Board():
         """
         Releases an ant from the nest
         """
-        new_ant = Ant(self.size // 2)
+        new_ant = Ant((self.size // 2))
         self.ants.append(new_ant)
 
     def evaporate(self): 
@@ -142,7 +142,7 @@ class Board():
                 ant.gather(self.nearby_food, self.food, self.possible_moves)
                 gatherers += 1
             elif self.ant_follows_trail(nearby_pheromones):
-                ant.follow(self.nearby_pheromones)
+                ant.follow(nearby_pheromones)
                 followers += 1
             else:
                 ant.explore(self.turning_kernel)
@@ -157,7 +157,7 @@ class Board():
         Deletes ants which have wandered off board
         """
         for ant in self.ants.copy():
-            if not self.is_in_grid(ant[0], ant[1]):
+            if not self.is_in_grid(ant.x, ant.y):
                 self.ants.remove(ant)
 
     def step(self):

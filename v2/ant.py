@@ -1,5 +1,8 @@
+import random 
+import numpy as np 
+
 class Ant():
-    def __init__(nest_location):
+    def __init__(self, nest_location):
         self.x = nest_location
         self.y = nest_location
         self.direction = random.randint(1,7)
