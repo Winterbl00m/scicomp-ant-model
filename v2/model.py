@@ -48,10 +48,8 @@ class Board():
         """
         Releases an ant from the nest
         """
-        nest = self.size // 2
-        direction = random.randint(1,7)
-        food_seen = 0
-        self.ants.append([nest, nest, direction, food_seen])
+        new_ant = Ant(self.size // 2)
+        self.ants.append(new_ant)
 
     def evaporate(self): 
         """
@@ -64,8 +62,8 @@ class Board():
         Adds of pheramones to the cell where the ant is presents
         """
         for ant in self.ants:
-            x = ant[0]
-            y = ant[1]
+            x = ant.x
+            y = ant.y
             #Ant adds less pheromone on more saturated trails
             self.pheromones[x][y] -= ((self.tau / self.sauturation_concentration) * self.pheromones[x][y]) 
 
@@ -73,7 +71,7 @@ class Board():
             self.pheromones[x][y] += self.tau 
 
             #Ant adds more pheromone when returning to nest
-            self.pheromones[x][y] += ant[3]
+            self.pheromones[x][y] += ant.food_seen
 
     def add_food(self, food_locations):
         """
@@ -97,11 +95,10 @@ class Board():
                 values (lst of floats) : the values of the adjecent cells
         """
         values = []
-        direction = ant[2]
-        for i in range(direction - 1, direction + 2, 1):
+        for i in range(ant.direction - 1, ant.direction + 2, 1):
             i = i % 8 
-            x = ant[0] + self.possible_moves[i][0] 
-            y = ant[1] + self.possible_moves[i][1]
+            x = ant.x + self.possible_moves[i][0] 
+            y = ant.y + self.possible_moves[i][1]
             is_in_grid = self.is_in_grid(x, y)
             if is_in_grid:
                 values.append(dataframe[x][y])
@@ -125,84 +122,9 @@ class Board():
             probability = (self.min_phi + self.delta_phi * concentration)/ 256
             return random.random() < probability
 
-    def follow(self, ant, nearby_pheromones):
+    def update_ants(self):
         """
-        Determines which trail a following ant will follow and updates its direction
-            Parameters:
-                ant (lst) : the ant to update
-                nearby_pheromones (lst): the pheromone amount in the three cells in front of the ant
-        """
-        left, straight, right = nearby_pheromones
-
-        #If trail ahead go stright
-        if straight != 0.0:
-            pass
-        #Otherwise follow strongest trail
-        elif left > right :
-            ant[2] = (ant[2] + 1) % 8  
-        elif right > left :
-            ant[2] = (ant[2] - 1) % 8 
-
-    def explore(self, ant):
-        """
-        Updates an exploring ant's direction
-            Parameters:
-                ant (lst) : the ant to update
-        """
-        prob_go_straight = 1 - 2 * sum(self.turning_kernel)
-        turning_probabilities = [prob_go_straight] + self.turning_kernel
-        turning_amount_choices = [0,1,2,3,4]
-        turn_amount = random.choices(turning_amount_choices, weights=turning_probabilities, k=1)[0]
-        turn_direction = random.randint(-1, 1) #left or right
-
-        new_direction = (ant[2] + turn_amount * turn_direction + 8) % 8
-        ant[2]  = new_direction
-
-    def gather(self, ant, nearby_food):
-        """
-        Decrease food in field and send a gathering ant home 
-            Parameters:
-                ant (lst) : the ant to update
-                nearby_food (lst): the food amount in the three cells in front of the ant
-        """
-        #Calculates where max nearby food is
-        max_food_index = nearby_food.index(max(nearby_food)) - 1
-        food_direction = (ant[2] + max_food_index) % 8 
-        food_x = ant[0] + self.possible_moves[food_direction][0]
-        food_y = ant[1] + self.possible_moves[food_direction][1]
-
-        #sets ant to return to the nest
-        ant[3] = self.food[food_x][food_y]
-        #removes 1 food from location
-        self.food[food_x][food_y] -= 1
-
-
-    def go_to_nest(self, ant):
-        """
-        Updates a ants direction to point towards nest
-            Parameters:
-                ant (lst) : the ant to update
-        """
-        nest = self.size // 2 
-        x_direction_of_nest = np.sign(nest - ant[0])
-        y_direction_of_nest = np.sign(nest - ant[1])
-        ant[2] = self.possible_moves.index((x_direction_of_nest, y_direction_of_nest))
-
-    def ant_at_nest(self, ant):
-        """
-        Updates and retuning ant's status if it is at the nest
-            Parameters:
-                ant (lst) : the ant to update
-        """
-        nest = self.size // 2 
-        at_nest = (ant[0] == nest and ant[1] == nest)
-        if ant[3] and at_nest:
-            # sets a retuning ant at next to  to the nest
-            ant[3] = 0
-
-    def turn_ants(self):
-        """
-        Updates ants directions 
+        Updates ants directions and position 
         """
         explorers = 0
         followers = 0
@@ -211,29 +133,24 @@ class Board():
         for ant in self.ants:
             nearby_pheromones = self.find_nearby_values(ant, self.pheromones)
             nearby_food = self.find_nearby_values(ant, self.food)
-            self.ant_at_nest(ant)
-            if ant[3]:
-                self.go_to_nest(ant)
+            ant.ant_at_nest()
+
+            if ant.food_seen:
+                ant.go_to_nest(self.possible_moves)
                 returners += 1
             elif any(nearby_food):
-                self.gather(ant, nearby_food)
+                ant.gather(self.nearby_food, self.food, self.possible_moves)
                 gatherers += 1
             elif self.ant_follows_trail(nearby_pheromones):
-                self.follow(ant, nearby_pheromones)
+                ant.follow(self.nearby_pheromones)
                 followers += 1
             else:
-                self.explore(ant)
+                ant.explore(self.turning_kernel)
                 explorers += 1
 
+            ant.x += self.possible_moves[ant.direction][0]
+            ant.y += self.possible_moves[ant.direction][1]
         return explorers, followers, gatherers, returners
-
-    def move_ants(self):
-        """
-        Updates ants positions forward in whichever direction it is facing
-        """
-        for ant in self.ants:
-            ant[0] += self.possible_moves[ant[2]][0]
-            ant[1] += self.possible_moves[ant[2]][1]
 
     def clean(self):
         """
@@ -250,10 +167,8 @@ class Board():
         self.release_ant()
         self.deposit()
         self.evaporate()
-        explorers, followers, gatherers, returners= self.turn_ants()
-        self.move_ants()
+        self.update_ants()
         self.clean()
-        return explorers, followers, gatherers, returners
 
     def run(self, minutes, food_locations):
         """
@@ -265,12 +180,8 @@ class Board():
             writer.writerow(food_locations.keys())
         for minute in range(minutes): 
             for seconds in range(60):
-                explorers, followers, gatherers, returners = self.step()
+                self.step()
             print(minute)   
-            # print("explorers = " + str(explorers))
-            # print("followers = " + str(followers))
-            # print("gatherers = " + str(gatherers))
-            # print("returners = " + str(returners))
             food_data = self.collect_food_data(food_locations)
             with open('data.csv', 'a', newline='') as csvfile:
                 writer = csv.writer(csvfile)
@@ -287,8 +198,8 @@ class Board():
         food = self.food.copy()
         food[food == 0] = np.nan
         for ant in self.ants:
-            ant_xs.append((ant[0] + .5))
-            ant_ys.append((ant[1] + .5))
+            ant_xs.append((ant.x + .5))
+            ant_ys.append((ant.y + .5))
         plt.pcolormesh(pheromones, cmap='Greys')
         plt.pcolormesh(food, cmap='jet')
         cmap = plt.cm.get_cmap('jet')
