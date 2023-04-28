@@ -2,6 +2,8 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import random
+import csv
+
 
 class Board():
     def __init__(
@@ -48,8 +50,8 @@ class Board():
         """
         nest = self.size // 2
         direction = random.randint(1,7)
-        returning_home = False
-        self.ants.append([nest, nest, direction, returning_home])
+        food_seen = 0
+        self.ants.append([nest, nest, direction, food_seen])
 
     def evaporate(self): 
         """
@@ -71,7 +73,7 @@ class Board():
             self.pheromones[x][y] += self.tau 
 
             #Ant adds more pheromone when returning to nest
-            self.pheromones[x][y] += self.tau * ant[3]
+            self.pheromones[x][y] += ant[3]
 
     def add_food(self, food_locations):
         """
@@ -84,7 +86,6 @@ class Board():
         for location, amount in food_locations.items():
             x,y = location 
             self.food[x][y] = amount 
-
 
     def find_nearby_values(self, ant, dataframe):
         """
@@ -169,10 +170,12 @@ class Board():
         food_direction = (ant[2] + max_food_index) % 8 
         food_x = ant[0] + self.possible_moves[food_direction][0]
         food_y = ant[1] + self.possible_moves[food_direction][1]
+
+        #sets ant to return to the nest
+        ant[3] = self.food[food_x][food_y]
         #removes 1 food from location
         self.food[food_x][food_y] -= 1
-        #sets ant to return to the nest
-        ant[3] = True
+
 
     def go_to_nest(self, ant):
         """
@@ -195,7 +198,7 @@ class Board():
         at_nest = (ant[0] == nest and ant[1] == nest)
         if ant[3] and at_nest:
             # sets a retuning ant at next to  to the nest
-            ant[3] = False
+            ant[3] = 0
 
     def turn_ants(self):
         """
@@ -252,18 +255,26 @@ class Board():
         self.clean()
         return explorers, followers, gatherers, returners
 
-    def run(self, minutes):
+    def run(self, minutes, food_locations):
         """
         Runs the model for a specified number of minutes
         """
+        self.add_food(food_locations)
+        with open('data.csv', 'w', newline='') as csvfile:
+            writer = csv.writer(csvfile)
+            writer.writerow(food_locations.keys())
         for minute in range(minutes): 
             for seconds in range(60):
                 explorers, followers, gatherers, returners = self.step()
             print(minute)   
-            print("explorers = " + str(explorers))
-            print("followers = " + str(followers))
-            print("gatherers = " + str(gatherers))
-            print("returners = " + str(returners))
+            # print("explorers = " + str(explorers))
+            # print("followers = " + str(followers))
+            # print("gatherers = " + str(gatherers))
+            # print("returners = " + str(returners))
+            food_data = self.collect_food_data(food_locations)
+            with open('data.csv', 'a', newline='') as csvfile:
+                writer = csv.writer(csvfile)
+                writer.writerow(food_data.values())
 
     def draw(self):
         """
@@ -286,8 +297,24 @@ class Board():
         # plt.scatter(ant_xs, ant_ys) #this line is still in development
         plt.show()
 
+    def collect_food_data(self, food_locations):
+        """
+        Finds the values of the cells adjacent to the ant
+            Parameters:
+                food (dict) : 
+                    keys -> locations in (x,y) form
+                    vals -> amount of food to add
+        """
+        current_food_at_locations = {}
+        for location, amount in food_locations.items():
+            x,y = location 
+            current_food_at_locations[location] = self.food[x][y]
+        return current_food_at_locations
+
+            
 model = Board()
-model.run(minutes = 60)
+food_locations ={(192,128) : 100, (64,128) : 10}
+model.run(minutes = 60, food_locations = food_locations)
 model.draw()
 
 
