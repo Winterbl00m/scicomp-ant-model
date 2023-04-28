@@ -6,6 +6,30 @@ import csv
 from ant import Ant
 
 class Board():
+    """The model containing the lattice and a set of ants
+    Attributes:
+    size : int
+        the width and height of the square lattice 
+    possible_moves : lst of tuples
+        a list of all possible moves
+    deposition_rate  : int 
+        how much pheramone an ant deposits per time step
+    min_phi : int (between 0 and 255)
+        the minimum probability that an ant will follow a trail
+    delta_phi : int 
+        the amount that the proability an ant will follow a trail increase per unit pheramone
+    sautration_concentration: int
+        the amount of pheramone above which an ant cannot differentiate.  
+    turning_kernal : list of floats
+        the proabilitlies that an exploring ant will make a specfic turn
+
+    pheromone : pandas Dataframe
+        a lattice of pheromone values on board
+    food : pandas Dataframe
+        a lattice of food values on board
+    ant : lst of Ants
+        a list of all Ants on board 
+    """
     def __init__(
         self, 
         size = 256, 
@@ -139,7 +163,7 @@ class Board():
                 ant.go_to_nest(self.possible_moves)
                 returners += 1
             elif any(nearby_food):
-                ant.gather(self.nearby_food, self.food, self.possible_moves)
+                ant.gather(nearby_food, self.food, self.possible_moves)
                 gatherers += 1
             elif self.ant_follows_trail(nearby_pheromones):
                 ant.follow(nearby_pheromones)

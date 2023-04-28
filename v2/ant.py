@@ -3,6 +3,21 @@ import numpy as np
 
 class Ant():
     def __init__(self, nest_location):
+        """An Ant Object
+        Attributes:
+        x : int 
+            ants x position
+        y : int 
+            ant y position 
+        direction : (between 0 and 7) 
+            the compass direction the ant is facing 
+            where 0 is north, 1 is north-est, 2 is east, etc. 
+        food_seen: int
+            the amount food that was at a source when a retuning ant left it.  
+        nest_location : int
+            the x and y position of the nest (assumed to be the same)
+        """
+
         self.x = nest_location
         self.y = nest_location
         self.direction = random.randint(1,7)
@@ -30,7 +45,7 @@ class Ant():
         """
         Updates an exploring ant's direction
             Parameters:
-                turning_kernel (lst) : a list of probabilities that an ant will turn
+                turning_kernel (lst) : a list of probabilities that an ant will turn a particular amount
         """
         prob_go_straight = 1 - 2 * sum(turning_kernel)
         turning_probabilities = [prob_go_straight] + turning_kernel
@@ -45,8 +60,9 @@ class Ant():
         """
         Decrease food in field and send a gathering ant home 
             Parameters:
-                ant (lst) : the ant to update
                 nearby_food (lst): the food amount in the three cells in front of the ant
+                food (df) : a dataframe of food values on board
+                possible_moves (lst) : a list of all possible moves
         """
         #Calculates where max nearby food is
         max_food_index = nearby_food.index(max(nearby_food)) - 1
@@ -63,7 +79,7 @@ class Ant():
         """
         Updates a ants direction to point towards nest
             Parameters:
-                ant (lst) : the ant to update
+                possible_moves (lst) : a list of all possible moves
         """
         x_direction_of_nest = np.sign(self.nest_location - self.x)
         y_direction_of_nest = np.sign(self.nest_location - self.y)
